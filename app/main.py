@@ -6,6 +6,7 @@ from .core.exceptions import ErrorAplicacion
 from .routes.autor_router import router as autor_router
 from .routes.categoria_router import router as categoria_router
 from .routes.libro_router import router as libro_router
+from .routes.socio_router import router as socio_router
 
 
 @asynccontextmanager
@@ -36,6 +37,7 @@ async def error_aplicacion_handler(request: Request, exc: ErrorAplicacion):
 app.include_router(autor_router)
 app.include_router(categoria_router)
 app.include_router(libro_router)
+app.include_router(socio_router)
 
 
 @app.get("/", tags=["Salud"])
