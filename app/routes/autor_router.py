@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Query, status
-from ..controllers import autor_controller
+from ..controllers import autor_controller, libro_controller
 from ..core.dependencies import PaginacionDep, SessionDep
 from ..schemas.autor import AutorActualizar, AutorCrear, AutorRespuesta
+from ..schemas.libro import LibroRespuesta
 
 router = APIRouter(
     prefix="/autores",
@@ -47,3 +48,15 @@ def eliminar_autor(id: int, db: SessionDep):
     """Elimina un autor por su ID si no tiene libros dependientes."""
     autor_controller.eliminar_autor(db=db, autor_id=id)
     return None
+
+
+@router.get("/{id}/libros", response_model=list[LibroRespuesta], status_code=status.HTTP_200_OK)
+def listar_libros_de_autor(id: int, db: SessionDep, paginacion: PaginacionDep):
+    """Lista los libros de un autor específico."""
+    return libro_controller.listar_libros_por_autor(
+        db=db,
+        autor_id=id,
+        skip=paginacion.skip,
+        limit=paginacion.limit
+    )
+

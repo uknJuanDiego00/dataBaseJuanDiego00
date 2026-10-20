@@ -5,6 +5,7 @@ from .core.database import Base, engine
 from .core.exceptions import ErrorAplicacion
 from .routes.autor_router import router as autor_router
 from .routes.categoria_router import router as categoria_router
+from .routes.libro_router import router as libro_router
 
 
 @asynccontextmanager
@@ -34,6 +35,7 @@ async def error_aplicacion_handler(request: Request, exc: ErrorAplicacion):
 # Registro de routers
 app.include_router(autor_router)
 app.include_router(categoria_router)
+app.include_router(libro_router)
 
 
 @app.get("/", tags=["Salud"])
