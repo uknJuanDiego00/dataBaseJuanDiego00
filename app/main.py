@@ -8,6 +8,7 @@ from .routes.categoria_router import router as categoria_router
 from .routes.libro_router import router as libro_router
 from .routes.socio_router import router as socio_router
 from .routes.prestamo_router import router as prestamo_router
+from .routes.reporte_router import router as reporte_router
 
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ app.include_router(categoria_router)
 app.include_router(libro_router)
 app.include_router(socio_router)
 app.include_router(prestamo_router)
+app.include_router(reporte_router)
 
 
 @app.get("/", tags=["Salud"])
