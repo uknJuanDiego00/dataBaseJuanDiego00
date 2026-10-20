@@ -1,13 +1,24 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from .core.database import engine, Base
+from .core.database import Base, engine
 from .core.exceptions import ErrorAplicacion
+from .routes.autor_router import router as autor_router
+from .routes.categoria_router import router as categoria_router
 
-# Creación de la aplicación FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Asegurar que todas las tablas existan en PostgreSQL al iniciar
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
 app = FastAPI(
     title="API Biblioteca SENA",
     description="Backend completo para gestión de biblioteca con FastAPI, SQLAlchemy y PostgreSQL",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 
@@ -18,6 +29,11 @@ async def error_aplicacion_handler(request: Request, exc: ErrorAplicacion):
         status_code=exc.status_code,
         content={"detail": exc.mensaje}
     )
+
+
+# Registro de routers
+app.include_router(autor_router)
+app.include_router(categoria_router)
 
 
 @app.get("/", tags=["Salud"])
