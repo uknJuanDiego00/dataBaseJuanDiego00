@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
+# pyrefly: ignore[missing-import]
 from fastapi import FastAPI, Request
+# pyrefly: ignore[missing-import]
 from fastapi.responses import JSONResponse
 from .core.database import Base, engine
 from .core.exceptions import ErrorAplicacion
