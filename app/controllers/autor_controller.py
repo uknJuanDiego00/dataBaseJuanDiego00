@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from ..core.exceptions import Conflicto, NoEncontrado
 from ..models.autor import Autor
 from ..models.libro import Libro
-from ..schemas.autor import AutorActualizar, AutorCrear
+from ..schemas.autor import AutorActualizar, AutorCrear, AutorRespuesta
+from ..schemas.pagina import Pagina
 
 
 def listar_autores(
@@ -11,13 +12,24 @@ def listar_autores(
     skip: int = 0,
     limit: int = 10,
     nacionalidad: str | None = None
-) -> list[Autor]:
-    """Retorna una lista paginada de autores con filtro opcional por nacionalidad."""
+) -> Pagina[AutorRespuesta]:
+    """Retorna una página de autores con filtro opcional por nacionalidad."""
     consulta = select(Autor)
     if nacionalidad:
         consulta = consulta.where(Autor.nacionalidad.ilike(f"%{nacionalidad.strip()}%"))
-    consulta = consulta.order_by(Autor.id).offset(skip).limit(limit)
-    return list(db.scalars(consulta).all())
+
+    conteo_query = select(func.count(Autor.id)).select_from(consulta.subquery())
+    total = db.scalar(conteo_query) or 0
+
+    items = list(db.scalars(consulta.order_by(Autor.id).offset(skip).limit(limit)).all())
+    items_schemas = [AutorRespuesta.model_validate(a) for a in items]
+
+    return Pagina[AutorRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 def obtener_autor(db: Session, autor_id: int) -> Autor:
@@ -77,7 +89,6 @@ def eliminar_autor(db: Session, autor_id: int) -> None:
     """Elimina un autor si no tiene libros asociados (409 si tiene libros)."""
     autor = obtener_autor(db, autor_id)
 
-    # Verificar si tiene libros dependientes
     total_libros = db.scalar(
         select(func.count(Libro.id)).where(Libro.autor_id == autor_id)
     )

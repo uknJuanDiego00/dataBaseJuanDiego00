@@ -1,19 +1,27 @@
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from .config import settings
 
-# Cargar variables de entorno desde el archivo .env
-load_dotenv()
+# Convención de nombres para restricciones e índices compatible con Alembic
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://postgres:1234@localhost:5432/biblioteca"
-)
+metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+# Clase Base para modelos declarativos de SQLAlchemy
+class Base(DeclarativeBase):
+    metadata = metadata
+
 
 # Motor de conexión a PostgreSQL
 engine = create_engine(
-    DATABASE_URL,
+    settings.DATABASE_URL,
     echo=False
 )
 
@@ -23,8 +31,3 @@ SessionLocal = sessionmaker(
     autoflush=False,
     expire_on_commit=False
 )
-
-
-# Clase Base para modelos declarativos de SQLAlchemy
-class Base(DeclarativeBase):
-    pass

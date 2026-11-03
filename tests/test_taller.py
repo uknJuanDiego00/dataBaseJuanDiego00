@@ -16,7 +16,12 @@ def setup_database():
 
 @pytest.fixture(scope="session")
 def client():
-    return TestClient(app)
+    from app.core.security import create_access_token
+    test_client = TestClient(app)
+    # Token de administrador para permitir las operaciones heredadas del Taller 1
+    admin_token = create_access_token(usuario_id=1, rol="admin")
+    test_client.headers["Authorization"] = f"Bearer {admin_token}"
+    return test_client
 
 
 def test_taller_completo(client: TestClient):
@@ -207,7 +212,8 @@ def test_taller_completo(client: TestClient):
     # Caso 5: Filtrar por novela histórica y ordenar por año descendente
     c5 = client.get(f"/libros?categoria_id={c2_id}&orden=-anio")
     assert c5.status_code == 200
-    libros_historicos = c5.json()
+    res5 = c5.json()
+    libros_historicos = res5["items"] if isinstance(res5, dict) and "items" in res5 else res5
     assert len(libros_historicos) == 2
     assert (
         libros_historicos[0]["anio_publicacion"]
@@ -219,7 +225,8 @@ def test_taller_completo(client: TestClient):
     # Caso 6: Buscar los libros de Mario Vargas Llosa
     c6 = client.get("/libros?autor=mario")
     assert c6.status_code == 200
-    libros_mario = c6.json()
+    res6 = c6.json()
+    libros_mario = res6["items"] if isinstance(res6, dict) and "items" in res6 else res6
     assert len(libros_mario) == 2
     ids_mario = {libro["id"] for libro in libros_mario}
     assert ids_mario == {l1_id, l2_id}
@@ -385,12 +392,14 @@ def test_taller_completo(client: TestClient):
     # Caso 24: Paginación sin repetir libros
     c24_pag1 = client.get("/libros?skip=0&limit=2")
     assert c24_pag1.status_code == 200
-    pag1 = c24_pag1.json()
+    res_p1 = c24_pag1.json()
+    pag1 = res_p1["items"] if isinstance(res_p1, dict) and "items" in res_p1 else res_p1
     assert len(pag1) == 2
 
     c24_pag2 = client.get("/libros?skip=2&limit=2")
     assert c24_pag2.status_code == 200
-    pag2 = c24_pag2.json()
+    res_p2 = c24_pag2.json()
+    pag2 = res_p2["items"] if isinstance(res_p2, dict) and "items" in res_p2 else res_p2
     assert len(pag2) == 2
 
     ids_pag1 = {libro["id"] for libro in pag1}

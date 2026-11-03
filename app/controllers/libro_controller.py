@@ -1,3 +1,4 @@
+from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 from ..core.exceptions import Conflicto, NoEncontrado, ReglaNegocio
@@ -5,7 +6,8 @@ from ..models.autor import Autor
 from ..models.categoria import Categoria
 from ..models.libro import Libro
 from ..models.prestamo import Prestamo
-from ..schemas.libro import LibroActualizar, LibroCrear, OrdenLibrosEnum
+from ..schemas.libro import LibroActualizar, LibroCrear, LibroRespuesta, OrdenLibrosEnum
+from ..schemas.pagina import Pagina
 
 
 def _asignar_disponibles(db: Session, libro: Libro) -> None:
@@ -29,8 +31,8 @@ def listar_libros(
     desde: int | None = None,
     hasta: int | None = None,
     orden: OrdenLibrosEnum | None = None
-) -> list[Libro]:
-    """Retorna una lista paginada de libros con filtros combinables y ordenamiento."""
+) -> Pagina[LibroRespuesta]:
+    """Retorna una página de libros con filtros combinables y ordenamiento."""
     consulta = select(Libro).options(
         selectinload(Libro.autor),
         selectinload(Libro.categorias)
@@ -51,6 +53,10 @@ def listar_libros(
     if hasta is not None:
         consulta = consulta.where(Libro.anio_publicacion <= hasta)
 
+    # Conteo total con la misma consulta filtrada
+    conteo_query = select(func.count(func.distinct(Libro.id))).select_from(consulta.subquery())
+    total = db.scalar(conteo_query) or 0
+
     # Ordenamiento
     if orden == OrdenLibrosEnum.titulo:
         consulta = consulta.order_by(Libro.titulo.asc())
@@ -64,7 +70,15 @@ def listar_libros(
     libros = list(db.scalars(consulta.offset(skip).limit(limit)).all())
     for lib in libros:
         _asignar_disponibles(db, lib)
-    return libros
+
+    items_schemas = [LibroRespuesta.model_validate(lib) for lib in libros]
+
+    return Pagina[LibroRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 def obtener_libro(db: Session, libro_id: int) -> Libro:
@@ -101,7 +115,7 @@ def crear_libro(db: Session, datos: LibroCrear) -> Libro:
         select(Libro).where(Libro.isbn == datos.isbn)
     )
     if isbn_existente:
-        raise Conflicto("Ya existe un libro con ese ISBN")
+        raise Conflicto("Ya existe un libro con ese código ISBN")
 
     nuevo_libro = Libro(
         titulo=datos.titulo,
@@ -115,29 +129,32 @@ def crear_libro(db: Session, datos: LibroCrear) -> Libro:
     db.commit()
     db.refresh(nuevo_libro)
 
-    # Cargar relaciones y calcular disponibles
-    nuevo_libro = obtener_libro(db, nuevo_libro.id)
-    return nuevo_libro
+    return obtener_libro(db, nuevo_libro.id)
 
 
-def actualizar_libro(db: Session, libro_id: int, datos: LibroActualizar) -> Libro:
-    """Actualiza los datos de un libro y reemplaza categorías si se enviaron."""
-    libro = db.scalar(
-        select(Libro).options(
-            selectinload(Libro.autor),
-            selectinload(Libro.categorias)
-        ).where(Libro.id == libro_id)
-    )
-    if not libro:
-        raise NoEncontrado("Libro no encontrado")
+def actualizar_libro(
+    db: Session,
+    libro_id: int,
+    datos: LibroActualizar
+) -> Libro:
+    """Actualiza solo los campos enviados de un libro."""
+    libro = obtener_libro(db, libro_id)
 
-    if datos.isbn is not None:
-        isbn_existente = db.scalar(
-            select(Libro).where(Libro.isbn == datos.isbn, Libro.id != libro_id)
-        )
-        if isbn_existente:
-            raise Conflicto("Ya existe otro libro con ese ISBN")
-        libro.isbn = datos.isbn
+    if datos.ejemplares is not None:
+        if datos.ejemplares <= 0:
+            raise ReglaNegocio("El número de ejemplares debe ser mayor a cero")
+
+        prestamos_activos = db.scalar(
+            select(func.count(Prestamo.id)).where(
+                Prestamo.libro_id == libro_id,
+                Prestamo.fecha_devolucion.is_(None)
+            )
+        ) or 0
+        if datos.ejemplares < prestamos_activos:
+            raise ReglaNegocio(
+                f"No puede reducir los ejemplares a {datos.ejemplares} porque hay {prestamos_activos} préstamos activos"
+            )
+        libro.ejemplares = datos.ejemplares
 
     if datos.autor_id is not None:
         autor = db.get(Autor, datos.autor_id)
@@ -153,20 +170,13 @@ def actualizar_libro(db: Session, libro_id: int, datos: LibroActualizar) -> Libr
             raise NoEncontrado("Una o más categorías no existen")
         libro.categorias = categorias
 
-    if datos.ejemplares is not None:
-        if datos.ejemplares < 1:
-            raise ReglaNegocio("Los ejemplares deben estar entre 1 y 50")
-
-        # Comprobar que no quede por debajo de préstamos sin devolver
-        prestamos_activos = db.scalar(
-            select(func.count(Prestamo.id)).where(
-                Prestamo.libro_id == libro_id,
-                Prestamo.fecha_devolucion.is_(None)
-            )
-        ) or 0
-        if datos.ejemplares < prestamos_activos:
-            raise ReglaNegocio("Los ejemplares no pueden quedar por debajo de los préstamos activos")
-        libro.ejemplares = datos.ejemplares
+    if datos.isbn is not None:
+        isbn_existente = db.scalar(
+            select(Libro).where(Libro.isbn == datos.isbn, Libro.id != libro_id)
+        )
+        if isbn_existente:
+            raise Conflicto("Ya existe otro libro con ese código ISBN")
+        libro.isbn = datos.isbn
 
     if datos.titulo is not None:
         libro.titulo = datos.titulo
@@ -193,7 +203,6 @@ def eliminar_libro(db: Session, libro_id: int) -> None:
     if prestamos_sin_devolver > 0:
         raise Conflicto("No se puede eliminar el libro porque tiene préstamos sin devolver")
 
-    # Si tiene préstamos devueltos en historial, se pueden eliminar o limpiar
     prestamos_devueltos = list(
         db.scalars(select(Prestamo).where(Prestamo.libro_id == libro_id)).all()
     )
@@ -209,8 +218,8 @@ def listar_libros_por_autor(
     autor_id: int,
     skip: int = 0,
     limit: int = 10
-) -> list[Libro]:
-    """Lista los libros pertenecientes a un autor específico."""
+) -> Pagina[LibroRespuesta]:
+    """Lista los libros pertenecientes a un autor específico con paginación."""
     autor = db.get(Autor, autor_id)
     if not autor:
         raise NoEncontrado("Autor no encontrado")
@@ -218,9 +227,20 @@ def listar_libros_por_autor(
     consulta = select(Libro).options(
         selectinload(Libro.autor),
         selectinload(Libro.categorias)
-    ).where(Libro.autor_id == autor_id).order_by(Libro.id.asc()).offset(skip).limit(limit)
+    ).where(Libro.autor_id == autor_id)
 
-    libros = list(db.scalars(consulta).all())
+    conteo_query = select(func.count(Libro.id)).where(Libro.autor_id == autor_id)
+    total = db.scalar(conteo_query) or 0
+
+    libros = list(db.scalars(consulta.order_by(Libro.id.asc()).offset(skip).limit(limit)).all())
     for lib in libros:
         _asignar_disponibles(db, lib)
-    return libros
+
+    items_schemas = [LibroRespuesta.model_validate(lib) for lib in libros]
+
+    return Pagina[LibroRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )

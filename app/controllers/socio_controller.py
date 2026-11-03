@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session, selectinload
 from ..core.exceptions import Conflicto, NoEncontrado
 from ..models.prestamo import Prestamo
 from ..models.socio import Socio
-from ..schemas.prestamo import EstadoPrestamoEnum
-from ..schemas.socio import SocioActualizar, SocioCrear
+from ..schemas.pagina import Pagina
+from ..schemas.prestamo import EstadoPrestamoEnum, PrestamoRespuesta
+from ..schemas.socio import SocioActualizar, SocioCrear, SocioMeActualizar, SocioRespuesta
 
 
 def listar_socios(
@@ -13,13 +14,24 @@ def listar_socios(
     skip: int = 0,
     limit: int = 10,
     activo: bool | None = None
-) -> list[Socio]:
-    """Retorna una lista paginada de socios con filtro opcional por estado activo."""
+) -> Pagina[SocioRespuesta]:
+    """Retorna una página de socios con filtro opcional por estado activo."""
     consulta = select(Socio)
     if activo is not None:
         consulta = consulta.where(Socio.activo == activo)
-    consulta = consulta.order_by(Socio.id.asc()).offset(skip).limit(limit)
-    return list(db.scalars(consulta).all())
+
+    conteo_query = select(func.count()).select_from(consulta.subquery())
+    total = db.scalar(conteo_query) or 0
+
+    items = list(db.scalars(consulta.order_by(Socio.id.asc()).offset(skip).limit(limit)).all())
+    items_schemas = [SocioRespuesta.model_validate(s) for s in items]
+
+    return Pagina[SocioRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 def obtener_socio(db: Session, socio_id: int) -> Socio:
@@ -83,6 +95,27 @@ def actualizar_socio(
     return socio
 
 
+def actualizar_socio_me(
+    db: Session,
+    socio_id: int,
+    datos: SocioMeActualizar
+) -> Socio:
+    """
+    Actualiza el perfil propio de un socio.
+    Regla Z4: Los socios no pueden modificar email, rol ni activo.
+    """
+    socio = obtener_socio(db, socio_id)
+
+    if datos.nombre is not None:
+        socio.nombre = datos.nombre
+    if datos.telefono is not None:
+        socio.telefono = datos.telefono
+
+    db.commit()
+    db.refresh(socio)
+    return socio
+
+
 def eliminar_socio(db: Session, socio_id: int) -> None:
     """
     Elimina un socio:
@@ -102,17 +135,15 @@ def eliminar_socio(db: Session, socio_id: int) -> None:
     if prestamos_sin_devolver > 0:
         raise Conflicto("No se puede eliminar el socio porque tiene préstamos sin devolver")
 
-    # 2. Comprobar si tiene préstamos registrados en su historial (ya devueltos)
+    # 2. Comprobar historial devuelto
     total_prestamos = db.scalar(
         select(func.count(Prestamo.id)).where(Prestamo.socio_id == socio_id)
     ) or 0
 
     if total_prestamos > 0:
-        # Borrado lógico: se marca inactivo
         socio.activo = False
         db.commit()
     else:
-        # Borrado físico
         db.delete(socio)
         db.commit()
 
@@ -123,9 +154,8 @@ def listar_prestamos_socio(
     skip: int = 0,
     limit: int = 10,
     estado: EstadoPrestamoEnum | None = None
-) -> list[Prestamo]:
-    """Lista los préstamos de un socio con filtro opcional de estado."""
-    # Verificar que el socio exista
+) -> Pagina[PrestamoRespuesta]:
+    """Lista los préstamos de un socio con paginación y filtro opcional de estado."""
     obtener_socio(db, socio_id)
 
     hoy = date.today()
@@ -147,10 +177,12 @@ def listar_prestamos_socio(
             Prestamo.fecha_limite >= hoy
         )
 
-    consulta = consulta.order_by(Prestamo.id.desc()).offset(skip).limit(limit)
-    prestamos = list(db.scalars(consulta).all())
+    conteo_query = select(func.count()).select_from(consulta.subquery())
+    total = db.scalar(conteo_query) or 0
 
-    # Calcular y asignar estado
+    consulta_paginada = consulta.order_by(Prestamo.id.desc()).offset(skip).limit(limit)
+    prestamos = list(db.scalars(consulta_paginada).all())
+
     for p in prestamos:
         if p.fecha_devolucion is not None:
             p.estado = "devuelto"
@@ -159,4 +191,51 @@ def listar_prestamos_socio(
         else:
             p.estado = "activo"
 
-    return prestamos
+    items_schemas = [PrestamoRespuesta.model_validate(p) for p in prestamos]
+
+    return Pagina[PrestamoRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
+
+
+def listar_multas_socio(
+    db: Session,
+    socio_id: int,
+    skip: int = 0,
+    limit: int = 10
+) -> Pagina[PrestamoRespuesta]:
+    """Retorna los préstamos con multas asociadas al socio especificado."""
+    obtener_socio(db, socio_id)
+
+    consulta = select(Prestamo).options(
+        selectinload(Prestamo.libro),
+        selectinload(Prestamo.socio)
+    ).where(
+        Prestamo.socio_id == socio_id,
+        Prestamo.multa > 0
+    )
+
+    conteo_query = select(func.count()).select_from(consulta.subquery())
+    total = db.scalar(conteo_query) or 0
+
+    prestamos = list(db.scalars(consulta.order_by(Prestamo.id.desc()).offset(skip).limit(limit)).all())
+    hoy = date.today()
+    for p in prestamos:
+        if p.fecha_devolucion is not None:
+            p.estado = "devuelto"
+        elif p.fecha_limite < hoy:
+            p.estado = "vencido"
+        else:
+            p.estado = "activo"
+
+    items_schemas = [PrestamoRespuesta.model_validate(p) for p in prestamos]
+
+    return Pagina[PrestamoRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )

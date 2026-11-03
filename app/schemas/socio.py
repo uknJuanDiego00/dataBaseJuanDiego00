@@ -70,6 +70,30 @@ class SocioActualizar(BaseModel):
         return None
 
 
+class SocioMeActualizar(BaseModel):
+    """Esquema restringido para que el propio socio actualice su perfil (Regla Z4)."""
+    nombre: str | None = Field(default=None, min_length=2, max_length=100)
+    telefono: str | None = Field(default=None, pattern=r"^[0-9+ ]{7,15}$")
+
+    @field_validator("nombre")
+    @classmethod
+    def validar_nombre(cls, v: str | None) -> str | None:
+        if v is not None:
+            limpio = v.strip()
+            if not limpio:
+                raise ValueError("El nombre no puede estar vacío")
+            return limpio.title()
+        return None
+
+    @field_validator("telefono")
+    @classmethod
+    def validar_telefono(cls, v: str | None) -> str | None:
+        if v is not None:
+            limpio = v.strip()
+            return limpio if limpio else None
+        return None
+
+
 class SocioRespuestaSimple(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

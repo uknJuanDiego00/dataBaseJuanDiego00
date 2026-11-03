@@ -29,3 +29,27 @@ class ReglaNegocio(ErrorAplicacion):
 
     def __init__(self, mensaje: str = "Regla de negocio no cumplida"):
         super().__init__(mensaje)
+
+
+class NoAutenticado(ErrorAplicacion):
+    """El usuario no está autenticado o el token es inválido."""
+    status_code: int = 401
+
+    def __init__(self, mensaje: str = "No autenticado"):
+        super().__init__(mensaje)
+
+
+class Prohibido(ErrorAplicacion):
+    """El usuario no tiene permisos para realizar la operación."""
+    status_code: int = 403
+
+    def __init__(self, mensaje: str = "Acceso prohibido"):
+        super().__init__(mensaje)
+
+
+class CuentaBloqueada(ErrorAplicacion):
+    """La cuenta está bloqueada temporalmente por intentos fallidos."""
+    status_code: int = 423
+
+    def __init__(self, mensaje: str = "Cuenta bloqueada temporalmente"):
+        super().__init__(mensaje)
