@@ -3,6 +3,7 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
 
+
 if TYPE_CHECKING:
     from .autor import Autor
     from .categoria import Categoria
@@ -35,6 +36,8 @@ class Libro(Base):
     titulo: Mapped[str] = mapped_column(String(150), nullable=False)
     isbn: Mapped[str] = mapped_column(String(13), unique=True, nullable=False, index=True)
     anio_publicacion: Mapped[int] = mapped_column(Integer, nullable=False)
+    url_imagen: Mapped[str | None] = mapped_column(String, nullable=True)
+    imagen_public_id: Mapped[str | None] = mapped_column(String, nullable=True)
     ejemplares: Mapped[int] = mapped_column(Integer, nullable=False)
     autor_id: Mapped[int] = mapped_column(ForeignKey("autores.id"), nullable=False)
 
@@ -45,6 +48,7 @@ class Libro(Base):
         secondary=libro_categoria,
         back_populates="libros"
     )
+
     prestamos: Mapped[list["Prestamo"]] = relationship(
         "Prestamo",
         back_populates="libro"

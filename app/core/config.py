@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Base de datos
-    DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/biblioteca"
-    TEST_DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/biblioteca_test"
+    DATABASE_URL: str = "postgresql+psycopg://didi_web_user:EewKgdL1ronaEnJwPPxnsPOB8J9gBrnw@dpg-dbkuml6k1f9s73e25v20-a.virginia-postgres.render.com/didi_web"
+    TEST_DATABASE_URL: str = "postgresql+psycopg://didi_web_user:EewKgdL1ronaEnJwPPxnsPOB8J9gBrnw@dpg-dbkuml6k1f9s73e25v20-a.virginia-postgres.render.com/didi_web"
 
     # Seguridad y JWT
     SECRET_KEY: str = "cambiar_clave_secreta_minimo_32_caracteres_hex_000"

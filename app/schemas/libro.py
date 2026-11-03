@@ -1,8 +1,12 @@
+import cloudinary
 from datetime import date
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .autor import AutorRespuestaSimple
 from .categoria import CategoriaRespuestaSimple
+from cloudinary import uploader
+from fastapi import UploadFile, File
+import io
 
 
 class OrdenLibrosEnum(str, Enum):
@@ -14,6 +18,7 @@ class OrdenLibrosEnum(str, Enum):
 class LibroBase(BaseModel):
     titulo: str = Field(..., min_length=1, max_length=150, description="Título del libro")
     isbn: str = Field(..., pattern=r"^\d{13}$", description="Código ISBN de exactamente 13 dígitos")
+    imagen: File | None = Field(default=None, description="URL de la imagen del libro")
     anio_publicacion: int = Field(..., ge=1450, description="Año de publicación (1450 - año actual)")
     ejemplares: int = Field(..., ge=1, le=50, description="Copias disponibles en la biblioteca (1 - 50)")
     autor_id: int = Field(..., gt=0, description="Identificador del autor")
@@ -40,7 +45,14 @@ class LibroCrear(LibroBase):
         ...,
         min_length=1,
         max_length=5,
-        description="Lista de IDs de categorías (entre 1 y 5, sin duplicados)"
+        description="Lista de IDs de categorías (entre 1 y 5, sin duplicados)"  
+    )
+    resultado = uploader.upload(
+        io.bytesIO(imagen),
+        folder = CARPETA,
+        public_id=f"{libro.titulo}_{libro.isbn}",
+        overwrite = True,
+        resource_type = "image"
     )
 
     @field_validator("categoria_ids")

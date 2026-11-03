@@ -183,6 +183,7 @@ def registrar_socio(db: Session, datos: RegistroSocio) -> Usuario:
     y la ficha de Socio en una sola transacción atómica.
     """
     email_norm = datos.email.strip().lower()
+    print(email_norm)
 
     # Comprobar unicidad en Usuario y Socio
     usuario_existente = db.scalar(
