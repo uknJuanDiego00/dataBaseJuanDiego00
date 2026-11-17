@@ -33,6 +33,8 @@ Sistema backend completo para la administración y control de una biblioteca pú
 │   │   ├── socio_controller.py     # Lógica, borrado lógico y préstamos por socio
 │   │   ├── prestamo_controller.py  # Reglas R1-R10, validación de inventario y cálculo de multas
 │   │   └── reporte_controller.py   # Consultas SQL individuales para reportes
+│   ├── services/
+│   │   └── cloudinary_service.py   # Gestión y subida de imágenes a Cloudinary
 │   └── routes/
 │       ├── autor_router.py         # Endpoints REST para /autores
 │       ├── categoria_router.py     # Endpoints REST para /categorias
@@ -110,9 +112,15 @@ pip install -r requirements.txt
 Crear el archivo `.env` a partir de `.env.example`:
 ```env
 DATABASE_URL=postgresql+psycopg://postgres:1234@localhost:5432/biblioteca
+CLOUDINARY_CLOUD_NAME=tu_cloud_name
+CLOUDINARY_API_KEY=tu_api_key
+CLOUDINARY_API_SECRET=tu_api_secret
 ```
 
-### 4. Iniciar la API
+### 4. Subida de portadas con Cloudinary
+- `POST /libros/{id}/portada`: Permite enviar un archivo (`multipart/form-data`) con campo `archivo` para subir la portada del libro a Cloudinary y almacenar la URL generada.
+
+### 5. Iniciar la API
 ```bash
 uvicorn app.main:app --reload
 ```

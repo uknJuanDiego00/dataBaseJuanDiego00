@@ -17,6 +17,7 @@ class LibroBase(BaseModel):
     anio_publicacion: int = Field(..., ge=1450, description="Año de publicación (1450 - año actual)")
     ejemplares: int = Field(..., ge=1, le=50, description="Copias disponibles en la biblioteca (1 - 50)")
     autor_id: int = Field(..., gt=0, description="Identificador del autor")
+    portada_url: str | None = Field(default=None, description="URL de la portada en Cloudinary")
 
     @field_validator("titulo")
     @classmethod
@@ -58,6 +59,7 @@ class LibroActualizar(BaseModel):
     ejemplares: int | None = Field(default=None, ge=0, le=50)
     autor_id: int | None = Field(default=None, gt=0)
     categoria_ids: list[int] | None = Field(default=None, min_length=1, max_length=5)
+    portada_url: str | None = Field(default=None, description="URL de la portada en Cloudinary")
 
     @field_validator("titulo")
     @classmethod
@@ -105,5 +107,6 @@ class LibroRespuesta(BaseModel):
     ejemplares: int
     autor_id: int
     disponibles: int
+    portada_url: str | None = None
     autor: AutorRespuestaSimple
     categorias: list[CategoriaRespuestaSimple]

@@ -37,6 +37,10 @@ class Libro(Base):
     anio_publicacion: Mapped[int] = mapped_column(Integer, nullable=False)
     ejemplares: Mapped[int] = mapped_column(Integer, nullable=False)
     autor_id: Mapped[int] = mapped_column(ForeignKey("autores.id"), nullable=False)
+    portada_url: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+
+    # Atributo dinámico para serialización en Pydantic
+    disponibles: int = 0
 
     # Relaciones
     autor: Mapped["Autor"] = relationship("Autor", back_populates="libros")
