@@ -1,3 +1,4 @@
+from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 from ..core.exceptions import Conflicto, NoEncontrado, ReglaNegocio
@@ -6,6 +7,7 @@ from ..models.categoria import Categoria
 from ..models.libro import Libro
 from ..models.prestamo import Prestamo
 from ..schemas.libro import LibroActualizar, LibroCrear, OrdenLibrosEnum
+from ..services import cloudinary_service
 
 
 def _asignar_disponibles(db: Session, libro: Libro) -> None:
@@ -109,7 +111,8 @@ def crear_libro(db: Session, datos: LibroCrear) -> Libro:
         anio_publicacion=datos.anio_publicacion,
         ejemplares=datos.ejemplares,
         autor_id=datos.autor_id,
-        categorias=categorias
+        categorias=categorias,
+        portada_url=datos.portada_url
     )
     db.add(nuevo_libro)
     db.commit()
@@ -174,8 +177,31 @@ def actualizar_libro(db: Session, libro_id: int, datos: LibroActualizar) -> Libr
     if datos.anio_publicacion is not None:
         libro.anio_publicacion = datos.anio_publicacion
 
+    if datos.portada_url is not None:
+        libro.portada_url = datos.portada_url
+
     db.commit()
     return obtener_libro(db, libro.id)
+
+
+def subir_portada_libro(db: Session, libro_id: int, archivo: UploadFile) -> Libro:
+    """Sube la imagen de portada a Cloudinary y asigna la URL al libro."""
+    libro = db.scalar(
+        select(Libro).options(
+            selectinload(Libro.autor),
+            selectinload(Libro.categorias)
+        ).where(Libro.id == libro_id)
+    )
+    if not libro:
+        raise NoEncontrado("Libro no encontrado")
+
+    url_portada = cloudinary_service.subir_imagen(archivo, carpeta="biblioteca/libros")
+    libro.portada_url = url_portada
+    db.commit()
+    db.refresh(libro)
+
+    _asignar_disponibles(db, libro)
+    return libro
 
 
 def eliminar_libro(db: Session, libro_id: int) -> None:

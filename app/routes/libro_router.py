@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, File, Query, UploadFile, status
 from ..controllers import libro_controller
 from ..core.dependencies import PaginacionDep, SessionDep
 from ..schemas.libro import (
@@ -62,3 +62,13 @@ def eliminar_libro(id: int, db: SessionDep):
     """Elimina un libro si no tiene préstamos activos."""
     libro_controller.eliminar_libro(db=db, libro_id=id)
     return None
+
+
+@router.post("/{id}/portada", response_model=LibroRespuesta, status_code=status.HTTP_200_OK)
+def subir_portada_libro(
+    id: int,
+    db: SessionDep,
+    archivo: UploadFile = File(..., description="Archivo de imagen de la portada (JPG, PNG, WEBP)")
+):
+    """Sube y asocia la portada de un libro usando Cloudinary."""
+    return libro_controller.subir_portada_libro(db=db, libro_id=id, archivo=archivo)

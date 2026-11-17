@@ -1,0 +1,54 @@
+services:
+  # ------------------------------------------------------------------
+  # Base de Datos PostgreSQL
+  # ------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: biblioteca_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-biblioteca}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-biblioteca}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # API REST FastAPI
+  # ------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biblioteca_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/biblioteca
+      - TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/biblioteca_test
+      - SECRET_KEY=${SECRET_KEY:-48ab24b81be29e8aeed03ede90c7a4e1f58ee24d3ef11447deffd3282175cfe1}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=15
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://localhost:8000"]
+      - ENVIRONMENT=development
+    volumes:
+      - .:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:
+
