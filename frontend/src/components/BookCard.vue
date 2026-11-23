@@ -32,8 +32,8 @@ const onFavoriteClick = (e) => {
     <!-- Portada con relación de aspecto consistente 2:2.8 -->
     <div class="book-cover-container">
       <img 
-        :src="book.cover" 
-        :alt="`Portada del libro ${book.title}`"
+        :src="book.portada_url || book.cover || book.url_imagen" 
+        :alt="`Portada del libro ${book.titulo || book.title || ''}`"
         class="book-cover-img"
         loading="lazy"
       />

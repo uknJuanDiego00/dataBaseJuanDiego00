@@ -1,8 +1,12 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
 import { CheckCircle2, Bookmark } from 'lucide-vue-next'
+
+const route = useRoute()
+const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
 const toast = ref({
   visible: false,
@@ -45,7 +49,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-layout">
+  <!-- Experiencia Administrativa (Sin cabecera ni pie públicos) -->
+  <div v-if="isAdminRoute" class="admin-wrapper">
+    <router-view />
+  </div>
+
+  <!-- Experiencia Pública de Lectura Serenidad -->
+  <div v-else class="app-layout">
     <!-- Cabecera Sticky -->
     <Header />
 
@@ -60,16 +70,16 @@ onUnmounted(() => {
 
     <!-- Pie de Página -->
     <Footer />
-
-    <!-- Notificación Toast Serena -->
-    <transition name="toast-slide">
-      <div v-if="toast.visible" class="serene-toast" :class="toast.type">
-        <CheckCircle2 v-if="toast.type === 'success'" :size="17" class="toast-icon" />
-        <Bookmark v-else :size="17" class="toast-icon" />
-        <span class="toast-text">{{ toast.message }}</span>
-      </div>
-    </transition>
   </div>
+
+  <!-- Notificación Toast Serena -->
+  <transition name="toast-slide">
+    <div v-if="toast.visible" class="serene-toast" :class="toast.type">
+      <CheckCircle2 v-if="toast.type === 'success'" :size="17" class="toast-icon" />
+      <Bookmark v-else :size="17" class="toast-icon" />
+      <span class="toast-text">{{ toast.message }}</span>
+    </div>
+  </transition>
 </template>
 
 <style scoped>

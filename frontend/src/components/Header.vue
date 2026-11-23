@@ -6,7 +6,8 @@ import {
   Search, 
   Menu, 
   X, 
-  User
+  User,
+  ShieldCheck
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -111,13 +112,13 @@ onUnmounted(() => {
           />
         </form>
 
-        <!-- Perfil del usuario / Lector -->
-        <div class="user-pill" title="Lector en modo sereno">
+        <!-- Perfil / Acceso Administrativo -->
+        <router-link to="/admin" class="user-pill admin-pill" title="Acceso al Panel de Administración">
           <div class="user-avatar">
-            <User :size="14" />
+            <ShieldCheck :size="14" />
           </div>
-          <span class="user-name">Lector</span>
-        </div>
+          <span class="user-name">Gestión</span>
+        </router-link>
 
         <!-- Botón Menú Móvil -->
         <button 
@@ -161,6 +162,9 @@ onUnmounted(() => {
           </router-link>
           <router-link to="/nosotros" class="mobile-link" @click="closeMobileMenu">
             Nosotros & Filosofía
+          </router-link>
+          <router-link to="/admin" class="mobile-link admin-highlight" @click="closeMobileMenu">
+            Panel de Gestión (/admin)
           </router-link>
         </nav>
       </div>
