@@ -1,12 +1,14 @@
-from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from ..controllers import libro_controller
-from ..core.dependencies import PaginacionDep, SessionDep
+from ..core.dependencies import PaginacionDep, SessionDep, UsuarioActualDep, requiere_rol
+from ..models.usuario import RolUsuario
 from ..schemas.libro import (
     LibroActualizar,
     LibroCrear,
     LibroRespuesta,
     OrdenLibrosEnum
 )
+from ..schemas.pagina import Pagina
 
 router = APIRouter(
     prefix="/libros",
@@ -14,7 +16,15 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=list[LibroRespuesta], status_code=status.HTTP_200_OK)
+@router.get(
+    "",
+    response_model=Pagina[LibroRespuesta],
+    status_code=status.HTTP_200_OK,
+    summary="Catálogo de libros paginado con filtros",
+    responses={
+        200: {"description": "Página del catálogo de libros"}
+    }
+)
 def listar_libros(
     db: SessionDep,
     paginacion: PaginacionDep,
@@ -45,26 +55,58 @@ def obtener_libro(id: int, db: SessionDep):
     return libro_controller.obtener_libro(db=db, libro_id=id)
 
 
-@router.post("", response_model=LibroRespuesta, status_code=status.HTTP_201_CREATED)
-def crear_libro(datos: LibroCrear, db: SessionDep):
+@router.post(
+    "",
+    response_model=LibroRespuesta,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar un nuevo libro (Bibliotecario o Admin)",
+    dependencies=[Depends(requiere_rol(RolUsuario.bibliotecario, RolUsuario.admin))]
+)
+def crear_libro(
+    datos: LibroCrear,
+    db: SessionDep
+):
     """Crea un nuevo libro en el catálogo."""
     return libro_controller.crear_libro(db=db, datos=datos)
 
 
-@router.patch("/{id}", response_model=LibroRespuesta, status_code=status.HTTP_200_OK)
-def actualizar_libro(id: int, datos: LibroActualizar, db: SessionDep):
+@router.patch(
+    "/{id}",
+    response_model=LibroRespuesta,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar un libro (Bibliotecario o Admin)",
+    dependencies=[Depends(requiere_rol(RolUsuario.bibliotecario, RolUsuario.admin))]
+)
+def actualizar_libro(
+    id: int,
+    datos: LibroActualizar,
+    db: SessionDep
+):
     """Actualiza los datos de un libro y reemplaza categorías si se enviaron."""
     return libro_controller.actualizar_libro(db=db, libro_id=id, datos=datos)
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_libro(id: int, db: SessionDep):
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un libro (Solo Admin)",
+    dependencies=[Depends(requiere_rol(RolUsuario.admin))]
+)
+def eliminar_libro(
+    id: int,
+    db: SessionDep
+):
     """Elimina un libro si no tiene préstamos activos."""
     libro_controller.eliminar_libro(db=db, libro_id=id)
     return None
 
 
-@router.post("/{id}/portada", response_model=LibroRespuesta, status_code=status.HTTP_200_OK)
+@router.post(
+    "/{id}/portada",
+    response_model=LibroRespuesta,
+    status_code=status.HTTP_200_OK,
+    summary="Subir portada de libro (Bibliotecario o Admin)"
+)
 def subir_portada_libro(
     id: int,
     db: SessionDep,

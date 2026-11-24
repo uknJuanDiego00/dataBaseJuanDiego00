@@ -12,15 +12,19 @@ TAMANIO_MAXIMO_BYTES = TAMANIO_MAXIMO_MB * 1024 * 1024
 
 def _configurar_cloudinary() -> None:
     """Configura el cliente de Cloudinary utilizando las variables de entorno."""
-    if not (settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_API_SECRET):
+    cloud_name = (settings.CLOUDINARY_CLOUD_NAME or "").strip()
+    api_key = (settings.CLOUDINARY_API_KEY or "").strip()
+    api_secret = (settings.CLOUDINARY_API_SECRET or "").strip()
+
+    if not (cloud_name and api_key and api_secret):
         raise ReglaNegocio(
-            "Cloudinary no está configurado. Verifique CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en el archivo .env"
+            "Cloudinary no está configurado. Verifique CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en las variables de entorno"
         )
 
     cloudinary.config(
-        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-        api_key=settings.CLOUDINARY_API_KEY,
-        api_secret=settings.CLOUDINARY_API_SECRET,
+        cloud_name=cloud_name,
+        api_key=api_key,
+        api_secret=api_secret,
         secure=True
     )
 

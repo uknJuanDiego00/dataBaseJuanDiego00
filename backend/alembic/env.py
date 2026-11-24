@@ -14,7 +14,7 @@ import os
 # Asegurar que el paquete app sea importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.core.config import get_settings
+from app.core.config import settings
 from app.core.database import Base
 
 # Importar TODOS los modelos para que sus tablas aparezcan en Base.metadata
@@ -25,8 +25,6 @@ import app.models.socio          # noqa: F401
 import app.models.prestamo       # noqa: F401
 import app.models.usuario        # noqa: F401
 import app.models.refresh_token  # noqa: F401
-
-settings = get_settings()
 
 # -----------------------------------------------------------------------
 # Alembic Config object

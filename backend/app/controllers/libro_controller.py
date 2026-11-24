@@ -6,7 +6,8 @@ from ..models.autor import Autor
 from ..models.categoria import Categoria
 from ..models.libro import Libro
 from ..models.prestamo import Prestamo
-from ..schemas.libro import LibroActualizar, LibroCrear, OrdenLibrosEnum
+from ..schemas.libro import LibroActualizar, LibroCrear, LibroRespuesta, OrdenLibrosEnum
+from ..schemas.pagina import Pagina
 from ..services import cloudinary_service
 
 
@@ -31,8 +32,8 @@ def listar_libros(
     desde: int | None = None,
     hasta: int | None = None,
     orden: OrdenLibrosEnum | None = None
-) -> list[Libro]:
-    """Retorna una lista paginada de libros con filtros combinables y ordenamiento."""
+) -> Pagina[LibroRespuesta]:
+    """Retorna una página de libros con filtros combinables y ordenamiento."""
     consulta = select(Libro).options(
         selectinload(Libro.autor),
         selectinload(Libro.categorias)
@@ -53,6 +54,10 @@ def listar_libros(
     if hasta is not None:
         consulta = consulta.where(Libro.anio_publicacion <= hasta)
 
+    # Conteo total con la misma consulta filtrada
+    conteo_query = select(func.count()).select_from(consulta.order_by(None).subquery())
+    total = db.scalar(conteo_query) or 0
+
     # Ordenamiento
     if orden == OrdenLibrosEnum.titulo:
         consulta = consulta.order_by(Libro.titulo.asc())
@@ -66,7 +71,15 @@ def listar_libros(
     libros = list(db.scalars(consulta.offset(skip).limit(limit)).all())
     for lib in libros:
         _asignar_disponibles(db, lib)
-    return libros
+
+    items_schemas = [LibroRespuesta.model_validate(lib) for lib in libros]
+
+    return Pagina[LibroRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 def obtener_libro(db: Session, libro_id: int) -> Libro:
@@ -186,6 +199,8 @@ def actualizar_libro(db: Session, libro_id: int, datos: LibroActualizar) -> Libr
 
 def subir_portada_libro(db: Session, libro_id: int, archivo: UploadFile) -> Libro:
     """Sube la imagen de portada a Cloudinary y asigna la URL al libro."""
+    url_portada = cloudinary_service.subir_imagen(archivo, carpeta="biblioteca/libros")
+
     libro = db.scalar(
         select(Libro).options(
             selectinload(Libro.autor),
@@ -195,7 +210,6 @@ def subir_portada_libro(db: Session, libro_id: int, archivo: UploadFile) -> Libr
     if not libro:
         raise NoEncontrado("Libro no encontrado")
 
-    url_portada = cloudinary_service.subir_imagen(archivo, carpeta="biblioteca/libros")
     libro.portada_url = url_portada
     db.commit()
     db.refresh(libro)
@@ -235,8 +249,8 @@ def listar_libros_por_autor(
     autor_id: int,
     skip: int = 0,
     limit: int = 10
-) -> list[Libro]:
-    """Lista los libros pertenecientes a un autor específico."""
+) -> Pagina[LibroRespuesta]:
+    """Lista los libros pertenecientes a un autor específico con paginación."""
     autor = db.get(Autor, autor_id)
     if not autor:
         raise NoEncontrado("Autor no encontrado")
@@ -244,9 +258,20 @@ def listar_libros_por_autor(
     consulta = select(Libro).options(
         selectinload(Libro.autor),
         selectinload(Libro.categorias)
-    ).where(Libro.autor_id == autor_id).order_by(Libro.id.asc()).offset(skip).limit(limit)
+    ).where(Libro.autor_id == autor_id)
 
-    libros = list(db.scalars(consulta).all())
+    conteo_query = select(func.count(Libro.id)).where(Libro.autor_id == autor_id)
+    total = db.scalar(conteo_query) or 0
+
+    libros = list(db.scalars(consulta.order_by(Libro.id.asc()).offset(skip).limit(limit)).all())
     for lib in libros:
         _asignar_disponibles(db, lib)
-    return libros
+
+    items_schemas = [LibroRespuesta.model_validate(lib) for lib in libros]
+
+    return Pagina[LibroRespuesta](
+        items=items_schemas,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
