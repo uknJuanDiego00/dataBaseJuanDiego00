@@ -54,6 +54,34 @@ limiter = Limiter(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Iniciando API de Biblioteca...")
+    try:
+        # Asegurar tablas y sembrar usuario admin si la base de datos está vacía (ideal para Render / Cloud)
+        from .core.database import Base, engine, SessionLocal
+        from .models.usuario import Usuario, RolUsuario
+        from .models import libro, autor, categoria, socio, prestamo, refresh_token
+        from .core.security import get_password_hash
+
+        Base.metadata.create_all(bind=engine)
+
+        with SessionLocal() as db:
+            admin_existente = db.query(Usuario).filter(Usuario.rol == RolUsuario.admin).first()
+            if not admin_existente:
+                logger.info("Base de datos sin administrador. Creando admin inicial para Render/Cloud...")
+                admin = Usuario(
+                    email="admin@biblioteca.com",
+                    nombre="Administrador Principal",
+                    password_hash=get_password_hash("Admin123*"),
+                    rol=RolUsuario.admin,
+                    activo=True
+                )
+                db.add(admin)
+                db.commit()
+                logger.info("Usuario administrador inicial creado: admin@biblioteca.com")
+            else:
+                logger.info(f"Administrador existente detectado: {admin_existente.email}")
+    except Exception as e:
+        logger.error(f"Error en inicialización automática de base de datos: {e}")
+
     yield
     logger.info("Cerrando API de Biblioteca...")
 
